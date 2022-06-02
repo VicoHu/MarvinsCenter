@@ -7,13 +7,12 @@ import {
   CSLGJXJYTask,
 } from '../../../../src/service/marvinsCluster/task/CSLGJXJYTask';
 import { MarvinsClusterService } from '../../../../src/service/marvinsCluster/marvinsCluster';
-
 describe('CSLGJXJYTask function test', () => {
   let app: Application;
   let clusterService: MarvinsClusterService;
 
   beforeAll(async () => {
-    // create app
+    // 创建
     app = await createApp<Framework>();
     clusterService = await app
       .getApplicationContext()
@@ -35,8 +34,8 @@ describe('CSLGJXJYTask function test', () => {
       .getAsync<CSLGJXJYTask>(CSLGJXJYTask);
 
     const jobData: CSLGJXJYJobData = {
-      userName: '',
-      password: '',
+      userName: '430902199909041019',
+      password: '430902199909041019',
     };
 
     expect(jobData.userName).not.toBeNull();
@@ -53,7 +52,11 @@ describe('CSLGJXJYTask function test', () => {
     }) => {
       const isLogin = await cslgjxjyTask.login(page);
       expect(isLogin).toBeTruthy();
-      await page.waitForTimeout(10000);
+      // await page.waitForTimeout(1200000);
     }) as any);
+  });
+
+  it('should cluster close', async () => {
+    await clusterService.close();
   });
 });

@@ -21,12 +21,13 @@ describe('marvinsCluster function test', () => {
   });
 
   it('should puppeteer test', async () => {
-    await puppeteer.launch({
+    const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
       executablePath:
-        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     });
+    await browser.close();
   });
 
   it('should init cluster', async () => {
@@ -35,7 +36,6 @@ describe('marvinsCluster function test', () => {
   });
 
   it('should cluster run task', async () => {
-    await clusterService.lazyInitCluster();
     await clusterService.runTask(null, (async ({
       page,
     }: {
@@ -45,4 +45,9 @@ describe('marvinsCluster function test', () => {
       console.log(await page.content());
     }) as any);
   });
+
+  it('should cluster close', async () => {
+    await clusterService.close();
+  });
+
 });

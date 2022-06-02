@@ -10,7 +10,8 @@
     "@midwayjs/web": "^3.0.0",
     "egg": "^2.0.0",
     "puppeteer-cluster": "^0.23.0",
-    "puppeteer-core": "^14.1.2"
+    "puppeteer-core": "^14.1.2",
+    "ts-node": "^10.8.0"
   },
   "devDependencies": {
     "@midwayjs/cli": "^1.0.0",

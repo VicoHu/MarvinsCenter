@@ -16,7 +16,7 @@ export class MarvinsClusterService {
    */
   async initCluster(): Promise<Cluster> {
     this.cluster = await Cluster.launch({
-      maxConcurrency: 2,
+      maxConcurrency: 1,
       timeout: 30000,
       puppeteerOptions: {
         headless: false,
@@ -43,12 +43,15 @@ export class MarvinsClusterService {
   getChromePathByOS(): string | null {
     if (os.type() === 'Windows_NT') {
       // windows
+      this.logger.info('当前系统为Windows');
       return 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
     } else if (os.type() === 'Darwin') {
       // mac
+      this.logger.info('当前系统为Mac');
       return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
     } else if (os.type() === 'Linux') {
       // Linux
+      this.logger.info('当前系统为Linux');
       return '/usr/bin/google-chrome';
     } else {
       // 如果没有找到，则返回null，并记录异常日志
@@ -74,7 +77,7 @@ export class MarvinsClusterService {
    * 检查是cluster是否已经初始化完成
    */
   checkClusterAlready(): boolean {
-    if (this.cluster !== undefined) {
+    if (this.cluster === undefined || this.cluster === null) {
       this.logger.error('Puppeteer Cluster has not already initialized');
       return false;
     }
@@ -89,9 +92,13 @@ export class MarvinsClusterService {
     // 检测是否已经初始化
     const isClusterAlready = this.checkClusterAlready();
     if (!isClusterAlready) {
-      this.logger.info('Try to initalize Puppeteer Cluster');
+      this.logger.info('Try to initialize Puppeteer Cluster');
       await this.initCluster();
       this.logger.info('Puppeteer Cluster has already initialized');
     }
+  }
+
+  async close() {
+    await this.cluster.close();
   }
 }

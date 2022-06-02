@@ -37,9 +37,8 @@ export class CSLGJXJYTask
    */
   async login(page: Page): Promise<boolean> {
     try {
-      page.isClosed();
       // 进入登录页面
-      await page.goto('https://csustcj.edu-edu.com.cn/');
+      await page.goto('https://csustcj.edu-edu.com.cn');
       // 等待元素加载
       const [userNameInput, passwordInput, loginButton] = await Promise.all([
         await page.$('input#txtUserName'),
@@ -47,10 +46,19 @@ export class CSLGJXJYTask
         await page.$('button#btnSign'),
       ]);
       // 输入账号密码
-      await userNameInput.type(this.jobData.userName, { delay: 50 });
-      await passwordInput.type(this.jobData.password, { delay: 50 });
+      await userNameInput.type(this.jobData.userName);
+      await passwordInput.type(this.jobData.password);
       // 点击登录按钮
       await loginButton.click({ delay: 100 });
+
+      await page.waitForNavigation({ waitUntil: 'networkidle0' });
+
+      await page.evaluate("$(\".modal-dialog\").remove();");
+
+      await page.waitForTimeout(10000);
+
+      return page.url().includes('/StudentSite/StudentSiteIndex/Index');
+
     } catch (e) {
       // 如果捕获到异常
       this.logger.error(e);
