@@ -14,14 +14,18 @@ export class MarvinsClusterService {
   /**
    * 初始化cluster
    */
-  async initCluster(): Promise<Cluster> {
+  async initCluster(chromePath?: string): Promise<Cluster> {
     this.cluster = await Cluster.launch({
       maxConcurrency: 1,
       timeout: 30000,
       puppeteerOptions: {
         headless: false,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        executablePath: this.getChromePathByOS(),
+        executablePath: chromePath ? chromePath : this.getChromePathByOS(),
+        defaultViewport: {
+          width: 1200,
+          height: 800,
+        },
       },
     });
     return this.cluster;

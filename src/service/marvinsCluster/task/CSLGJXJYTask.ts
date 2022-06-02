@@ -1,5 +1,5 @@
 import { ICourseTask } from './ICourseTask';
-import { Page } from 'puppeteer-core';
+import { ElementHandle, Page } from 'puppeteer-core';
 import { TaskFunction } from 'puppeteer-cluster/dist/Cluster';
 import { Inject, Provide } from '@midwayjs/decorator';
 import { ILogger } from '@midwayjs/core';
@@ -10,6 +10,14 @@ export interface CSLGJXJYJobData {
 }
 
 export interface CSLGJXJYReturnData {
+  isDone: boolean;
+}
+
+interface ICourseInfo {
+  id: string;
+  name: string;
+  schedule: number;
+  score: number;
   isDone: boolean;
 }
 
@@ -51,14 +59,13 @@ export class CSLGJXJYTask
       // 点击登录按钮
       await loginButton.click({ delay: 100 });
 
-      await page.waitForNavigation({ waitUntil: 'networkidle0' });
+      await page.waitForNavigation({ waitUntil: 'domcontentloaded' });
 
-      await page.evaluate("$(\".modal-dialog\").remove();");
+      await page.evaluate("$('#modalPSW').hide();");
 
       await page.waitForTimeout(10000);
 
       return page.url().includes('/StudentSite/StudentSiteIndex/Index');
-
     } catch (e) {
       // 如果捕获到异常
       this.logger.error(e);
@@ -73,8 +80,66 @@ export class CSLGJXJYTask
     return Promise.resolve(undefined);
   }
 
-  collectCourses(page: Page): Promise<number> {
-    return Promise.resolve(0);
+  async collectCourses(page: Page): Promise<number> {
+    // 直接进入全部课程的第一页
+    await page.goto(
+      'https://csustcj.edu-edu.com.cn/System/OnlineLearning/OnlineLearningIndex?page=1&isCurrent=0',
+      {
+        waitUntil: 'domcontentloaded',
+      }
+    );
+
+    const ulCourseList = await page.waitForSelector('ul.curriculum');
+    const courseLiList = await ulCourseList.$$('li');
+
+    const courseInfoList: ICourseInfo[] = new Array<ICourseInfo>();
+    // 获取课程信息
+    for (const courseLiListElement of courseLiList) {
+      courseInfoList.push(
+        await this.getCourseInfoByLiElement(courseLiListElement)
+      );
+    }
+
+    // TODO: 翻页
+
+    this.logger.warn(JSON.stringify(courseInfoList));
+    return courseInfoList.length;
+  }
+
+  /**
+   * 根据课程的li标签，获取课程信息
+   * @param courseLiElement 课程的li标签
+   */
+  async getCourseInfoByLiElement(
+    courseLiElement: ElementHandle
+  ): Promise<ICourseInfo> {
+    const courseInfo: ICourseInfo = {
+      id: '',
+      name: '',
+      schedule: 0,
+      score: 0,
+      isDone: false,
+    } as ICourseInfo;
+    // 获取课程ID
+    courseInfo.id = await courseLiElement.$eval(
+      'div.curriculum_information p.learning a.refresh',
+      node => node.id.replace('refreshID', '')
+    );
+    // 获取课程名称
+    courseInfo.name = await courseLiElement.$eval(
+      'div.curriculum_information h3',
+      node => node.innerHTML
+    );
+    // 获取课程分数
+    courseInfo.score = Number(
+      await courseLiElement.$eval(
+        '#lblcurcj' + courseInfo.id,
+        node => node.innerHTML
+      )
+    );
+    // 计算获得课程进度
+    courseInfo.schedule = courseInfo.score / 100;
+    return courseInfo;
   }
 
   doTask(page: Page): Promise<boolean> {
