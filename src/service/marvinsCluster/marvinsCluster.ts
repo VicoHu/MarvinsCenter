@@ -3,6 +3,7 @@ import { Cluster } from 'puppeteer-cluster';
 import * as os from 'os';
 import { TaskFunction } from 'puppeteer-cluster/dist/Cluster';
 import { ILogger } from '@midwayjs/core';
+import * as PuppeteerExtra from 'puppeteer-extra';
 
 @Provide()
 export class MarvinsClusterService {
@@ -15,9 +16,14 @@ export class MarvinsClusterService {
    * 初始化cluster
    */
   async initCluster(chromePath?: string): Promise<Cluster> {
+    // PuppeteerExtra使用PuppeteerCore作为核心
+    const puppeteerExtra = PuppeteerExtra.addExtra(require('puppeteer-core'));
+    // 初始化Cluster集群
     this.cluster = await Cluster.launch({
-      maxConcurrency: 1,
+      concurrency: Cluster.CONCURRENCY_BROWSER,
+      maxConcurrency: 3,
       timeout: 30000,
+      puppeteer: puppeteerExtra,
       puppeteerOptions: {
         headless: false,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
