@@ -18,15 +18,26 @@ export class MarvinsClusterService {
   async initCluster(chromePath?: string): Promise<Cluster> {
     // PuppeteerExtra使用PuppeteerCore作为核心
     const puppeteerExtra = PuppeteerExtra.addExtra(require('puppeteer-core'));
+
+    // 消除puppeteer标记
+    const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+    puppeteerExtra.use(StealthPlugin());
+
     // 初始化Cluster集群
     this.cluster = await Cluster.launch({
       concurrency: Cluster.CONCURRENCY_BROWSER,
-      maxConcurrency: 3,
-      timeout: 30000,
+      maxConcurrency: 5,
+      timeout: 3000000,
       puppeteer: puppeteerExtra,
       puppeteerOptions: {
         headless: false,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-web-security',
+          '--disable-features=IsolateOrigins',
+          '--disable-site-isolation-trials',
+        ],
         executablePath: chromePath ? chromePath : this.getChromePathByOS(),
         defaultViewport: {
           width: 1200,

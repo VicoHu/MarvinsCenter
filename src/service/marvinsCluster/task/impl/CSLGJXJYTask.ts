@@ -53,7 +53,7 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
       // 点击登录按钮
       await loginButton.click({ delay: 100 });
       // 等待登录成功
-      await page.waitForNavigation({ waitUntil: 'domcontentloaded' });
+      await page.waitForNavigation({ waitUntil: 'networkidle0' });
       // 关闭掉多余弹窗
       await page.evaluate("$('#modalPSW').hide();");
       // 返回是否登录成功

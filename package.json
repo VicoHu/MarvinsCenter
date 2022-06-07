@@ -12,6 +12,7 @@
     "puppeteer-cluster": "^0.23.0",
     "puppeteer-core": "^14.1.2",
     "puppeteer-extra": "^3.2.3",
+    "puppeteer-extra-plugin-stealth": "^2.9.0",
     "ts-node": "^10.8.0"
   },
   "devDependencies": {

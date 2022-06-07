@@ -22,7 +22,8 @@ describe('CSLGJXJYTask function test', () => {
   });
 
   it('should init cluster', async () => {
-    const cluster = await clusterService.initCluster('F:\\chrome-win\\chrome.exe');
+    const cluster = await clusterService.initCluster();
+    // const cluster = await clusterService.initCluster('F:\\chrome-win\\chrome.exe');
     expect(cluster).not.toBeNull();
   });
 
@@ -49,12 +50,24 @@ describe('CSLGJXJYTask function test', () => {
       const courseInfos = await cslgjxjyTask.collectCourses(page);
 
       for (const courseInfo of courseInfos) {
-        await clusterService.runTask(null, (async ({ page: pageNew }: { page: puppeteer.Page }) => {
+        clusterService.runTask(null, (async ({ page: pageNew }: { page: puppeteer.Page }) => {
           await cslgjxjyTask.login(pageNew);
-
-          await page.evaluate((courseInfo as CSLGJXJYCourseInfo).videoEntryFunction);
-          await page.waitForTimeout(3000);
-          const pages = await page.browser().pages();
+          // 直接进入全部课程的第一页
+          await pageNew.goto(
+            'https://csustcj.edu-edu.com.cn/System/OnlineLearning/OnlineLearningIndex?page=1&isCurrent=0',
+            {
+              waitUntil: 'domcontentloaded',
+            }
+          );
+          const elementElementHandle = await pageNew.waitForSelector('ul.curriculum').catch(() => {
+            console.warn('未找到 ul.curriculum');
+          });
+          if (elementElementHandle) {
+            console.log('已找到 ul.curriculum');
+          }
+          await pageNew.evaluate((courseInfo as CSLGJXJYCourseInfo).videoEntryFunction);
+          await pageNew.waitForTimeout(3000);
+          const pages = await pageNew.browser().pages();
           await pages[pages.length - 1].close();
 
           // 跳转到课程入口页面
@@ -68,10 +81,14 @@ describe('CSLGJXJYTask function test', () => {
           await startLearnButton.evaluate(node => node.setAttribute('target', '_self'));
           // 点击开始学习按钮
           await startLearnButton.click();
+          await pageNew.waitForNavigation();
+          const autoplayButton = await pageNew.waitForSelector('span.ui-auto-play-off');
+          await autoplayButton.click();
+          await pageNew.waitForTimeout(300000);
         }) as any);
       }
 
-      await page.waitForTimeout(10000);
+      await page.waitForTimeout(1000000);
     }) as any);
   }, 360000);
 
