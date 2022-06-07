@@ -1,8 +1,8 @@
-import { ICourseTask } from '../ICourseTask';
+import { ICourseTask } from '../courseTask/ICourseTask';
 import { ElementHandle, Page } from 'puppeteer-core';
 import { Inject, Provide } from '@midwayjs/decorator';
 import { ILogger } from '@midwayjs/core';
-import { ICourseInfo } from '../ICourseInfo';
+import { ICourseInfo } from '../courseTask/ICourseInfo';
 
 export interface CSLGJXJYJobData {
   userName: string;
@@ -156,14 +156,42 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
     return true;
   }
 
-  async doTaskSingle(page: Page, courseInfo: CSLGJXJYCourseInfo): Promise<boolean> {
-    // 跳转到课程入口页面
-    await page.goto(`https://whcj.edu-edu.com/cws/home/embed/user/default/m/${courseInfo.courseCode}/entry`);
-    // 等待页面加载出开始学习按钮
-    const startLearnButton = await page.waitForSelector('a.ui-action-learn');
-    await startLearnButton.evaluate(node => node.setAttribute('target', '_self'));
-    // 点击开始学习按钮
-    await startLearnButton.click();
+  public async doTaskSingle(page: Page, courseInfo: CSLGJXJYCourseInfo): Promise<boolean> {
+    const startTime = new Date();
+    try {
+      await page.goto('https://csustcj.edu-edu.com.cn/System/OnlineLearning/OnlineLearningIndex?page=1&isCurrent=0', {
+        waitUntil: 'domcontentloaded',
+      });
+      const elementElementHandle = await page.waitForSelector('ul.curriculum').catch(() => {
+        console.warn('未找到 ul.curriculum');
+      });
+      if (elementElementHandle) {
+        console.log('已找到 ul.curriculum');
+      }
+      await page.evaluate((courseInfo as CSLGJXJYCourseInfo).videoEntryFunction);
+      await page.waitForTimeout(3000);
+      const pages = await page.browser().pages();
+      await pages[pages.length - 1].close();
+
+      // 跳转到课程入口页面
+      await page.goto(
+        `https://whcj.edu-edu.com/cws/home/embed/user/default/m/${(courseInfo as CSLGJXJYCourseInfo).courseCode}/entry`
+      );
+      // 等待页面加载出开始学习按钮
+      const startLearnButton = await page.waitForSelector('a.ui-action-learn');
+      await startLearnButton.evaluate(node => node.setAttribute('target', '_self'));
+      // 点击开始学习按钮
+      await startLearnButton.click();
+      await page.waitForNavigation();
+      const autoplayButton = await page.waitForSelector('span.ui-auto-play-off');
+      await autoplayButton.click();
+      // 观看 5 小时
+      await page.waitForTimeout(5 * 60 * 60 * 1000);
+    } catch (error) {
+      // 计算耗时, 最小单位（秒）
+      const timeConsuming = (new Date().getTime() - startTime.getTime()) / 1000;
+      this.logger.error(`[DoTaskSingle] [${courseInfo.id}-${courseInfo.name}] [已完成时间：${timeConsuming}] ${error}`);
+    }
     return true;
   }
 

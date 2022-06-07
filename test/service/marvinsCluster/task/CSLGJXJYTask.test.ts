@@ -4,8 +4,9 @@ import { Framework } from '@midwayjs/web';
 import * as puppeteer from 'puppeteer-core';
 import { CSLGJXJYJobData, CSLGJXJYTask } from '../../../../src/service/marvinsCluster/task/impl/CSLGJXJYTask';
 import { MarvinsClusterService } from '../../../../src/service/marvinsCluster/marvinsCluster';
-import { ICourseTask } from '../../../../dist/service/marvinsCluster/task/ICourseTask';
-import { CSLGJXJYCourseInfo, CSLGJXJYReturnData } from '../../../../dist/service/marvinsCluster/task/impl/CSLGJXJYTask';
+import { RetryUtil } from '../../../../src/utils/RetryUtil';
+import { CSLGJXJYReturnData, CSLGJXJYCourseInfo } from '../../../../src/service/marvinsCluster/task/impl/CSLGJXJYTask';
+import { ICourseTask } from '../../../../src/service/marvinsCluster/task/courseTask/ICourseTask';
 
 describe('CSLGJXJYTask function test', () => {
   let app: Application;
@@ -32,9 +33,13 @@ describe('CSLGJXJYTask function test', () => {
       .getApplicationContext()
       .getAsync<CSLGJXJYTask>(CSLGJXJYTask);
 
+    // const jobData: CSLGJXJYJobData = {
+    //   userName: '43062320001130301X',
+    //   password: '43062320001130301X',
+    // };
     const jobData: CSLGJXJYJobData = {
-      userName: '43062320001130301X',
-      password: '43062320001130301X',
+      userName: '430902199909041019',
+      password: '430902199909041019',
     };
 
     expect(jobData.userName).not.toBeNull();
@@ -45,52 +50,49 @@ describe('CSLGJXJYTask function test', () => {
     await cslgjxjyTask.init(jobData);
 
     await clusterService.runTask(null, (async ({ page }: { page: puppeteer.Page }) => {
-      const isLogin = await cslgjxjyTask.login(page);
+      const isLogin = await RetryUtil.retryable<boolean>(
+        async () => {
+          const isOK = await cslgjxjyTask.login(page);
+          if (isOK) {
+            return true;
+          }
+          throw new Error('login failed');
+        },
+        3,
+        false
+      );
       expect(isLogin).toBeTruthy();
       const courseInfos = await cslgjxjyTask.collectCourses(page);
 
       for (const courseInfo of courseInfos) {
-        clusterService.runTask(null, (async ({ page: pageNew }: { page: puppeteer.Page }) => {
-          await cslgjxjyTask.login(pageNew);
-          // 直接进入全部课程的第一页
-          await pageNew.goto(
-            'https://csustcj.edu-edu.com.cn/System/OnlineLearning/OnlineLearningIndex?page=1&isCurrent=0',
-            {
-              waitUntil: 'domcontentloaded',
-            }
-          );
-          const elementElementHandle = await pageNew.waitForSelector('ul.curriculum').catch(() => {
-            console.warn('未找到 ul.curriculum');
-          });
-          if (elementElementHandle) {
-            console.log('已找到 ul.curriculum');
-          }
-          await pageNew.evaluate((courseInfo as CSLGJXJYCourseInfo).videoEntryFunction);
-          await pageNew.waitForTimeout(3000);
-          const pages = await pageNew.browser().pages();
-          await pages[pages.length - 1].close();
+        clusterService
+          .runTask(null, (async ({ page: pageNew }: { page: puppeteer.Page }) => {
+            await RetryUtil.retryable<boolean>(
+              async () => {
+                const isOK = await cslgjxjyTask.login(pageNew);
+                if (isOK) {
+                  return true;
+                }
+                throw new Error('login failed');
+              },
+              3,
+              false
+            );
 
-          // 跳转到课程入口页面
-          await pageNew.goto(
-            `https://whcj.edu-edu.com/cws/home/embed/user/default/m/${
-              (courseInfo as CSLGJXJYCourseInfo).courseCode
-            }/entry`
-          );
-          // 等待页面加载出开始学习按钮
-          const startLearnButton = await pageNew.waitForSelector('a.ui-action-learn');
-          await startLearnButton.evaluate(node => node.setAttribute('target', '_self'));
-          // 点击开始学习按钮
-          await startLearnButton.click();
-          await pageNew.waitForNavigation();
-          const autoplayButton = await pageNew.waitForSelector('span.ui-auto-play-off');
-          await autoplayButton.click();
-          await pageNew.waitForTimeout(300000);
-        }) as any);
+            // 直接进入全部课程的第一页
+            await (cslgjxjyTask as CSLGJXJYTask).doTaskSingle(pageNew, <CSLGJXJYCourseInfo>courseInfo);
+          }) as any)
+          .then(r => {
+            console.info(`任务结束：[${courseInfo.name}]}]`);
+          })
+          .catch(e => {
+            console.warn(`任务异常结束：[${courseInfo.name}]}]-[${e}]`);
+          });
       }
 
-      await page.waitForTimeout(1000000);
+      await page.waitForTimeout(18000000);
     }) as any);
-  }, 360000);
+  }, 18000000);
 
   it('should cluster close', async () => {
     await clusterService.close();
