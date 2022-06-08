@@ -119,6 +119,16 @@ export class MarvinsClusterService {
     }
   }
 
+  /**
+   * 判断 cluster 是否初始化
+   */
+  public isClusterInitialization() {
+    return this.cluster !== null && this.cluster !== undefined;
+  }
+
+  /**
+   * 关闭 cluster
+   */
   async close() {
     await this.cluster.close();
   }

@@ -22,13 +22,13 @@ describe('CSLGJXJYTask function test', () => {
     await close(app);
   });
 
-  it('should init cluster', async () => {
+  test('should init cluster', async () => {
     const cluster = await clusterService.initCluster();
     // const cluster = await clusterService.initCluster('F:\\chrome-win\\chrome.exe');
     expect(cluster).not.toBeNull();
   });
 
-  it('should CSLGJXJYTask run', async () => {
+  test('should CSLGJXJYTask run', async () => {
     const cslgjxjyTask: ICourseTask<CSLGJXJYJobData, CSLGJXJYReturnData> = await app
       .getApplicationContext()
       .getAsync<CSLGJXJYTask>(CSLGJXJYTask);
@@ -94,7 +94,7 @@ describe('CSLGJXJYTask function test', () => {
     }) as any);
   }, 18000000);
 
-  it('should cluster close', async () => {
+  test('should cluster close', async () => {
     await clusterService.close();
   });
 });
