@@ -26,7 +26,7 @@ export class MarvinsClusterService {
     // 初始化Cluster集群
     this.cluster = await Cluster.launch({
       concurrency: Cluster.CONCURRENCY_BROWSER,
-      maxConcurrency: 7,
+      maxConcurrency: 10,
       timeout: 18000000,
       puppeteer: puppeteerExtra,
       puppeteerOptions: {

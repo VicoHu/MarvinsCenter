@@ -57,7 +57,8 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
       // 关闭掉多余弹窗
       await page.evaluate("$('#modalPSW').hide();");
       // 返回是否登录成功
-      return page.url().includes('/StudentSite/StudentSiteIndex/Index');
+      page.url().includes('/StudentSiteNew/StudentSiteIndexNew/IndexNew') ? this.logger.info('登录成功'): this.logger.error('登录失败');
+      return page.url().includes('/StudentSiteNew/StudentSiteIndexNew/IndexNew');
     } catch (e) {
       // 如果捕获到异常
       this.logger.error(e);
@@ -71,10 +72,17 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
   }
 
   async collectCourses(page: Page): Promise<Array<ICourseInfo>> {
-    // 直接进入全部课程的第一页
-    await page.goto('https://csustcj.edu-edu.com.cn/System/OnlineLearning/OnlineLearningIndex?page=1&isCurrent=0', {
-      waitUntil: 'domcontentloaded',
+    this.logger.info('开始收集课程信息，当前学期的课程');
+
+    await page.on('dialog', async dialog => {
+      await dialog.dismiss();
     });
+    // 直接进入全部课程的第一页
+    await page.goto('https://csustcj.edu-edu.com.cn/MyOnlineCourseNew/OnlineLearningNew/OnlineLearningNewIndex', {
+      waitUntil: 'networkidle0',
+    });
+
+
 
     // 等待元素加载
     const [paginationUl] = await Promise.all([page.waitForSelector('ul.pagination')]);
@@ -84,27 +92,37 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
     const pageSize = pageLiList.length;
     const pageCurrent = await paginationUl.$eval<string>('li.active a', node => node.innerHTML);
 
+    this.logger.info(`当前页码：${pageCurrent}，总页码：${pageSize}`)
+
     const courseInfoList: CSLGJXJYCourseInfo[] = new Array<CSLGJXJYCourseInfo>();
+    const host = await CSLGJXJYTask.getHost(page);
+    this.logger.info(`host: ${host}`);
 
     for (let i = parseInt(pageCurrent) - 1; i < pageSize; i++) {
-      // 分页跳转
-      await page.goto(
-        (await CSLGJXJYTask.getHost(page)) + `/System/OnlineLearning/OnlineLearningIndex?page=${i + 1}&isCurrent=0`
-      );
+
+      this.logger.info(`开始收集第${i + 1}页的课程信息，当前学期的课程`);
+      // // 分页跳转
+      // await page.goto(
+      //   (await CSLGJXJYTask.getHost(page)) + `/MyOnlineCourseNew/OnlineLearningNew/OnlineLearningNewIndex?page=${i + 1}&isCurrent=0`, {
+      //     waitUntil: 'networkidle0',
+      //   }
+      // );
+
 
       // 找到课程列表元素
-      const ulCourseList = await page.waitForSelector('ul.curriculum');
-      const courseLiList = await ulCourseList.$$('li');
+      const allCourseContainer = await page.waitForSelector('div.online-lists-box');
+      const courseItemContainerList = await allCourseContainer.$$('div.single-lists div.list-content div.list-content-right');
 
       // 获取课程信息
-      for (const courseLiListElement of courseLiList) {
-        courseInfoList.push(await this.getCourseInfoByLiElement(courseLiListElement));
+      for (const courseItemContainerElement of courseItemContainerList) {
+        courseInfoList.push(await this.getCourseInfoByCourseItemContainerElement(courseItemContainerElement));
       }
     }
     // 记录日志
-    this.logger.info(JSON.stringify(courseInfoList));
+    this.logger.info('课程信息收集完毕');
+    this.logger.info("课程信息为", JSON.stringify(courseInfoList));
 
-    await page.evaluate(courseInfoList[5].videoEntryFunction);
+    await page.evaluate(courseInfoList[0].videoEntryFunction);
     await page.waitForTimeout(3000);
     const pages = await page.browser().pages();
     await pages[pages.length - 1].close();
@@ -118,9 +136,9 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
 
   /**
    * 根据课程的li标签，获取课程信息
-   * @param courseLiElement 课程的li标签
+   * @param courseItemContainerElement 课程的li标签
    */
-  async getCourseInfoByLiElement(courseLiElement: ElementHandle): Promise<CSLGJXJYCourseInfo> {
+  async getCourseInfoByCourseItemContainerElement(courseItemContainerElement: ElementHandle): Promise<CSLGJXJYCourseInfo> {
     const courseInfo: CSLGJXJYCourseInfo = {
       id: '',
       name: '',
@@ -129,17 +147,17 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
       isDone: false,
     } as CSLGJXJYCourseInfo;
     // 获取课程ID
-    courseInfo.id = await courseLiElement.$eval('div.curriculum_information p.learning a.refresh', node =>
-      node.id.replace('refreshID', '')
+    courseInfo.id = await courseItemContainerElement.$eval('div.score div.score-left span:nth-of-type(2)', node =>
+      node.id.replace('lblcurcj', '')
     );
     // 获取课程名称
-    courseInfo.name = await courseLiElement.$eval('div.curriculum_information h3', node => node.innerHTML);
+    courseInfo.name = await courseItemContainerElement.$eval('h3', node => node.innerHTML);
     // 获取课程分数
-    courseInfo.score = Number(await courseLiElement.$eval('#lblcurcj' + courseInfo.id, node => node.innerHTML));
+    courseInfo.score = Number(await courseItemContainerElement.$eval('#lblcurcj' + courseInfo.id, node => node.innerHTML));
     // 计算获得课程进度
     courseInfo.schedule = courseInfo.score / 100;
     // 获取课件入口函数
-    courseInfo.videoEntryFunction = await courseLiElement.$eval('#btnKJ1', node =>
+    courseInfo.videoEntryFunction = await courseItemContainerElement.$eval('#btnKJ1', node =>
       node.getAttribute('onclick').replace('return ', '')
     );
     // 获取课程Code （方便后期的直接跳转课程页面）
@@ -148,6 +166,7 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
   }
 
   async doTask(page: Page, courseInfoList: Array<CSLGJXJYCourseInfo>): Promise<boolean> {
+    this.logger.info(`开始执行单用户集群任务, 共计 ${courseInfoList.length} 门课程`);
     for (const cslgjxjyCourseInfo of courseInfoList) {
       const pageNew = await page.browserContext().newPage();
       await this.doTaskSingle(pageNew, cslgjxjyCourseInfo);
@@ -158,39 +177,68 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
 
   public async doTaskSingle(page: Page, courseInfo: CSLGJXJYCourseInfo): Promise<boolean> {
     const startTime = new Date();
+    this.logger.info(`开始执行课程 【${courseInfo.name}】 的单用户单课程集群任务`);
+    await page.on('dialog', async dialog => {
+      await dialog.dismiss();
+    });
+    let interval = null as NodeJS.Timeout;
     try {
-      await page.goto('https://csustcj.edu-edu.com.cn/System/OnlineLearning/OnlineLearningIndex?page=1&isCurrent=0', {
-        waitUntil: 'domcontentloaded',
+      await page.goto('https://csustcj.edu-edu.com.cn/MyOnlineCourseNew/OnlineLearningNew/OnlineLearningNewIndex', {
+        waitUntil: 'networkidle0',
       });
-      const elementElementHandle = await page.waitForSelector('ul.curriculum').catch(() => {
-        console.warn('未找到 ul.curriculum');
-      });
-      if (elementElementHandle) {
-        console.log('已找到 ul.curriculum');
-      }
-      await page.evaluate((courseInfo as CSLGJXJYCourseInfo).videoEntryFunction);
-      await page.waitForTimeout(3000);
-      const pages = await page.browser().pages();
-      await pages[pages.length - 1].close();
 
-      // 跳转到课程入口页面
-      await page.goto(
-        `https://whcj.edu-edu.com/cws/home/embed/user/default/m/${(courseInfo as CSLGJXJYCourseInfo).courseCode}/entry`
-      );
-      // 等待页面加载出开始学习按钮
-      const startLearnButton = await page.waitForSelector('a.ui-action-learn');
-      await startLearnButton.evaluate(node => node.setAttribute('target', '_self'));
-      // 点击开始学习按钮
-      await startLearnButton.click();
-      await page.waitForNavigation();
-      const autoplayButton = await page.waitForSelector('span.ui-auto-play-off');
+      this.logger.info(`【${courseInfo.name}】 运行视频页跳转函数`);
+      // 运行函数
+      await page.evaluate((courseInfo as CSLGJXJYCourseInfo).videoEntryFunction);
+      this.logger.info(`【${courseInfo.name}】 运行视频页跳转函数成功`);
+      await page.waitForTimeout(10000);
+      const pages = await page.browser().pages();
+      const vedioPage = await pages[pages.length - 1];
+
+      if (vedioPage.url().includes("https://cws.edu-edu.com/page/client#/courseware-player")) {
+        this.logger.info(`【${courseInfo.name}】 视频页跳转成功，开始进行自动化处理`);
+      } else {
+        await vedioPage.waitForNavigation({waitUntil: 'networkidle0'});
+      }
+      // 关闭页面的dialog
+      await vedioPage.on('dialog', async dialog => {
+        await dialog.dismiss();
+      });
+      const playButton = await vedioPage.waitForSelector('div.prism-big-play-btn');
+      await playButton.click();
+      this.logger.info(`【${courseInfo.name}】 视频开始播放`);
+      const autoplayButton = await vedioPage.waitForSelector('div.chain-broadcast span.ivu-switch');
       await autoplayButton.click();
+      this.logger.info(`【${courseInfo.name}】 开启视频自动播放功能`);
+
+      // 删除所有的模态框dom节点
+      await vedioPage.evaluate(() => {
+        const modalList = document.querySelectorAll('div.v-transfer-dom');
+        modalList.forEach(modal => {
+          if(modal) {
+            modal.remove();
+          }
+        });
+      });
+
+      // 每隔5s检测一次是否被暂停
+      interval = setInterval(async () => {
+        const playerStatus = await vedioPage.evaluate("window.player.getStatus()");
+        // 如果状态是暂停，则继续播放
+        if (playerStatus == 'pause') {
+          await vedioPage.evaluate("window.player.play();");
+        }
+      }, 5 * 1000);
+
       // 观看 5 小时
-      await page.waitForTimeout(5 * 60 * 60 * 1000);
+      await vedioPage.waitForTimeout(5 * 60 * 60 * 1000);
     } catch (error) {
       // 计算耗时, 最小单位（秒）
       const timeConsuming = (new Date().getTime() - startTime.getTime()) / 1000;
       this.logger.error(`[DoTaskSingle] [${courseInfo.id}-${courseInfo.name}] [已完成时间：${timeConsuming}] ${error}`);
+    } finally {
+      // 清除定时器
+      clearInterval(interval);
     }
     return true;
   }

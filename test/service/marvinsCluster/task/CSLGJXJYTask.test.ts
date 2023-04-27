@@ -10,6 +10,7 @@ import { MarvinsClusterService } from '../../../../src/service/marvinsCluster/ma
 import { RetryUtil } from '../../../../src/utils/RetryUtil';
 import { CSLGJXJYReturnData, CSLGJXJYCourseInfo } from '../../../../src/service/marvinsCluster/task/impl/CSLGJXJYTask';
 import { ICourseTask } from '../../../../src/service/marvinsCluster/task/courseTask/ICourseTask';
+import {ICourseInfo} from "../../../../src/service/marvinsCluster/task/courseTask/ICourseInfo";
 
 describe('CSLGJXJYTask function test', () => {
   let app: Application;
@@ -32,6 +33,34 @@ describe('CSLGJXJYTask function test', () => {
   });
 
   test('should CSLGJXJYTask run', async () => {
+    function startSingleCourseTaskCluster(courseInfo: ICourseInfo) {
+      clusterService
+        .runTask(null, (async ({page: pageNew}: { page: puppeteer.Page }) => {
+          await RetryUtil.retryable<boolean>(
+            async () => {
+              const isOK = await cslgjxjyTask.login(pageNew);
+              if (isOK) {
+                return true;
+              }
+              throw new Error('login failed');
+            },
+            3,
+            false
+          );
+
+          // 直接进入全部课程的第一页
+          await (cslgjxjyTask as CSLGJXJYTask).doTaskSingle(pageNew, <CSLGJXJYCourseInfo>courseInfo);
+        }) as any)
+        .then(r => {
+          console.info(`任务结束：[${courseInfo.name}]}]`);
+        })
+        .catch(e => {
+          console.warn(`任务异常结束：[${courseInfo.name}]}]-[${e}]`);
+        });
+    }
+
+    // 倍率
+    const rate: number = 2;
     const cslgjxjyTask: ICourseTask<CSLGJXJYJobData, CSLGJXJYReturnData> = await app
       .getApplicationContext()
       .getAsync<CSLGJXJYTask>(CSLGJXJYTask);
@@ -68,29 +97,21 @@ describe('CSLGJXJYTask function test', () => {
       const courseInfos = await cslgjxjyTask.collectCourses(page);
 
       for (const courseInfo of courseInfos) {
-        clusterService
-          .runTask(null, (async ({ page: pageNew }: { page: puppeteer.Page }) => {
-            await RetryUtil.retryable<boolean>(
-              async () => {
-                const isOK = await cslgjxjyTask.login(pageNew);
-                if (isOK) {
-                  return true;
-                }
-                throw new Error('login failed');
-              },
-              3,
-              false
-            );
+        for (let i = 0; i < rate; i++) {
+          await RetryUtil.retryable<boolean>(
+            async () => {
+              try {
+                startSingleCourseTaskCluster(courseInfo);
+                return true;
+              } catch (e) {
+                throw new Error(`${courseInfo.name} startSingleCourseTaskCluster failed`);
+              }
+            },
+            3,
+            false
+          )
 
-            // 直接进入全部课程的第一页
-            await (cslgjxjyTask as CSLGJXJYTask).doTaskSingle(pageNew, <CSLGJXJYCourseInfo>courseInfo);
-          }) as any)
-          .then(r => {
-            console.info(`任务结束：[${courseInfo.name}]}]`);
-          })
-          .catch(e => {
-            console.warn(`任务异常结束：[${courseInfo.name}]}]-[${e}]`);
-          });
+        }
       }
 
       await page.waitForTimeout(18000000);
