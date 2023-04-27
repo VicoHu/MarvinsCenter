@@ -7,6 +7,7 @@
     "@midwayjs/bootstrap": "^3.0.0",
     "@midwayjs/core": "^3.0.0",
     "@midwayjs/decorator": "^3.0.0",
+    "@midwayjs/serverless-app": "^3.11.4",
     "@midwayjs/web": "^3.0.0",
     "egg": "^2.0.0",
     "puppeteer-cluster": "^0.23.0",
@@ -39,7 +40,8 @@
     "lint": "mwts check",
     "lint:fix": "mwts fix",
     "ci": "npm run cov",
-    "build": "midway-bin build -c"
+    "build": "midway-bin build -c",
+    "unit-test": "midway-bin test -f test/service/marvinsCluster/task/CSLGJXJYTask.test.ts"
   },
   "midway-bin-clean": [
     ".vscode/.tsbuildinfo",

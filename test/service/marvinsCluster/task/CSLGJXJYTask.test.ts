@@ -1,5 +1,8 @@
 import { Application } from 'egg';
-import { close, createApp } from '@midwayjs/mock';
+import {
+  close,
+  createApp,
+} from '@midwayjs/mock';
 import { Framework } from '@midwayjs/web';
 import * as puppeteer from 'puppeteer-core';
 import { CSLGJXJYJobData, CSLGJXJYTask } from '../../../../src/service/marvinsCluster/task/impl/CSLGJXJYTask';
