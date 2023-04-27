@@ -33,7 +33,36 @@ describe('CSLGJXJYTask function test', () => {
   });
 
   test('should CSLGJXJYTask run', async () => {
-    function startSingleCourseTaskCluster(courseInfo: ICourseInfo) {
+    const Sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay))
+    // async function startSingleCourseTaskCluster(courseInfo: ICourseInfo, index: number) {
+    //   clusterService
+    //     .runTask(null, (async ({page: pageNew}: { page: puppeteer.Page }) => {
+    //       await RetryUtil.retryable<boolean>(
+    //         async () => {
+    //           const isOK = await cslgjxjyTask.login(pageNew);
+    //           if (isOK) {
+    //             return true;
+    //           }
+    //           throw new Error('login failed');
+    //         },
+    //         3,
+    //         false
+    //       );
+    //
+    //       // 直接进入全部课程的第一页
+    //       await (cslgjxjyTask as CSLGJXJYTask).doTaskSingle(pageNew, <CSLGJXJYCourseInfo>courseInfo, index);
+    //     }) as any)
+    //     .then(r => {
+    //       console.info(`任务结束：[${courseInfo.name}]}]`);
+    //     })
+    //     .catch(e => {
+    //       console.warn(`任务异常结束：[${courseInfo.name}]}]-[${e}]`);
+    //     });
+    //   // 停顿7秒
+    //   await Sleep(7000);
+    // }
+
+    async function startSingleCourseTaskCluster(courseInfo: ICourseInfo, rate: number) {
       clusterService
         .runTask(null, (async ({page: pageNew}: { page: puppeteer.Page }) => {
           await RetryUtil.retryable<boolean>(
@@ -47,9 +76,16 @@ describe('CSLGJXJYTask function test', () => {
             3,
             false
           );
+          const originPageNew = pageNew;
+          await pageNew.goto("https://www.baidu.com")
+          for (let index = 0; index < rate; index++) {
+            pageNew = await pageNew.browserContext().newPage();
+            (cslgjxjyTask as CSLGJXJYTask).doTaskSingle(pageNew, <CSLGJXJYCourseInfo>courseInfo, index);
+          }
 
-          // 直接进入全部课程的第一页
-          await (cslgjxjyTask as CSLGJXJYTask).doTaskSingle(pageNew, <CSLGJXJYCourseInfo>courseInfo);
+          // 观看 5 小时
+          await originPageNew.waitForTimeout(5 * 60 * 60 * 1000);
+
         }) as any)
         .then(r => {
           console.info(`任务结束：[${courseInfo.name}]}]`);
@@ -57,10 +93,12 @@ describe('CSLGJXJYTask function test', () => {
         .catch(e => {
           console.warn(`任务异常结束：[${courseInfo.name}]}]-[${e}]`);
         });
+      // 停顿7秒
+      await Sleep(7000);
     }
 
     // 倍率
-    const rate: number = 2;
+    const rate: number = 5;
     const cslgjxjyTask: ICourseTask<CSLGJXJYJobData, CSLGJXJYReturnData> = await app
       .getApplicationContext()
       .getAsync<CSLGJXJYTask>(CSLGJXJYTask);
@@ -94,26 +132,23 @@ describe('CSLGJXJYTask function test', () => {
         false
       );
       expect(isLogin).toBeTruthy();
-      const courseInfos = await cslgjxjyTask.collectCourses(page);
+      let courseInfos = await cslgjxjyTask.collectCourses(page);
+      courseInfos = courseInfos.filter(item => item.name.includes("计算机组成原理"))
 
       for (const courseInfo of courseInfos) {
-        for (let i = 0; i < rate; i++) {
-          await RetryUtil.retryable<boolean>(
-            async () => {
-              try {
-                startSingleCourseTaskCluster(courseInfo);
-                return true;
-              } catch (e) {
-                throw new Error(`${courseInfo.name} startSingleCourseTaskCluster failed`);
-              }
-            },
-            3,
-            false
-          )
-
-        }
+        await RetryUtil.retryable<boolean>(
+          async () => {
+            try {
+              await startSingleCourseTaskCluster(courseInfo, rate);
+              return true;
+            } catch (e) {
+              throw new Error(`${courseInfo.name} startSingleCourseTaskCluster failed`);
+            }
+          },
+          3,
+          false
+        )
       }
-
       await page.waitForTimeout(18000000);
     }) as any);
   }, 18000000);

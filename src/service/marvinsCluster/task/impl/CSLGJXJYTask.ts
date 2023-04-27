@@ -3,6 +3,7 @@ import { ElementHandle, Page } from 'puppeteer-core';
 import { Inject, Provide } from '@midwayjs/decorator';
 import { ILogger } from '@midwayjs/core';
 import { ICourseInfo } from '../courseTask/ICourseInfo';
+import * as UserAgent from 'user-agents';
 
 export interface CSLGJXJYJobData {
   userName: string;
@@ -122,7 +123,7 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
     this.logger.info('课程信息收集完毕');
     this.logger.info("课程信息为", JSON.stringify(courseInfoList));
 
-    await page.evaluate(courseInfoList[0].videoEntryFunction);
+    await page.evaluate(courseInfoList[courseInfoList.length - 1].videoEntryFunction);
     await page.waitForTimeout(3000);
     const pages = await page.browser().pages();
     await pages[pages.length - 1].close();
@@ -145,6 +146,10 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
       schedule: 0,
       score: 0,
       isDone: false,
+      courseStartTime: '',
+      courseEndTime: '',
+      homeworkStartTime: '',
+      homeworkEndTime: ''
     } as CSLGJXJYCourseInfo;
     // 获取课程ID
     courseInfo.id = await courseItemContainerElement.$eval('div.score div.score-left span:nth-of-type(2)', node =>
@@ -162,6 +167,9 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
     );
     // 获取课程Code （方便后期的直接跳转课程页面）
     courseInfo.courseCode = courseInfo.videoEntryFunction.match(/\('(.*?)',/)[1];
+    let infoArray = courseInfo.videoEntryFunction.match(/\('(.*?)'\)\;/)[1]?.replace("'","")?.split(",");
+    courseInfo.courseStartTime = infoArray[1];
+    courseInfo.courseEndTime = infoArray[2];
     return courseInfo;
   }
 
@@ -169,13 +177,13 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
     this.logger.info(`开始执行单用户集群任务, 共计 ${courseInfoList.length} 门课程`);
     for (const cslgjxjyCourseInfo of courseInfoList) {
       const pageNew = await page.browserContext().newPage();
-      await this.doTaskSingle(pageNew, cslgjxjyCourseInfo);
+      await this.doTaskSingle(pageNew, cslgjxjyCourseInfo, 1);
     }
     await page.waitForTimeout(10000);
     return true;
   }
 
-  public async doTaskSingle(page: Page, courseInfo: CSLGJXJYCourseInfo): Promise<boolean> {
+  public async doTaskSingle(page: Page, courseInfo: CSLGJXJYCourseInfo, index: number): Promise<boolean> {
     const startTime = new Date();
     this.logger.info(`开始执行课程 【${courseInfo.name}】 的单用户单课程集群任务`);
     await page.on('dialog', async dialog => {
@@ -200,6 +208,11 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
       } else {
         await vedioPage.waitForNavigation({waitUntil: 'networkidle0'});
       }
+
+      // 获取一个随机的user-agent
+      const randomUserAgent = this.getRandomUserAgent();
+      await vedioPage.setUserAgent(randomUserAgent)
+
       // 关闭页面的dialog
       await vedioPage.on('dialog', async dialog => {
         await dialog.dismiss();
@@ -220,6 +233,13 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
           }
         });
       });
+
+      const courseUnitListContainer = await vedioPage.waitForSelector("div.video-box-left div.ivu-tree");
+      const courseUnitList = await courseUnitListContainer.$$("ul.ivu-tree-children");
+      const courseUnitItem = courseUnitList[index];
+      const elementUnitItemBtn = await courseUnitItem.$("span.render-content__video span");
+      await elementUnitItemBtn.click();
+
 
       // 每隔5s检测一次是否被暂停
       interval = setInterval(async () => {
@@ -245,5 +265,11 @@ export class CSLGJXJYTask implements ICourseTask<CSLGJXJYJobData, CSLGJXJYReturn
 
   sendMessage(): Promise<boolean> {
     return Promise.resolve(false);
+  }
+
+  private getRandomUserAgent() {
+    const randomUserAgent = new UserAgent();
+    this.logger.info(`随机一个UserAgent: ${randomUserAgent.toString()}`)
+    return randomUserAgent.toString();
   }
 }

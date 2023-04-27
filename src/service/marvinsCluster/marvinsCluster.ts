@@ -26,11 +26,11 @@ export class MarvinsClusterService {
     // 初始化Cluster集群
     this.cluster = await Cluster.launch({
       concurrency: Cluster.CONCURRENCY_BROWSER,
-      maxConcurrency: 10,
+      maxConcurrency: 8,
       timeout: 18000000,
       puppeteer: puppeteerExtra,
       puppeteerOptions: {
-        headless: true,
+        headless: false,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
